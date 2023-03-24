@@ -1,0 +1,28 @@
+--cpu Cortex-M3
+"transit\startup_stm32f103xb.o"
+"transit\driver.o"
+"transit\main.o"
+"transit\gpio.o"
+"transit\tim.o"
+"transit\usart.o"
+"transit\stm32f1xx_it.o"
+"transit\stm32f1xx_hal_msp.o"
+"transit\stm32f1xx_hal_gpio_ex.o"
+"transit\stm32f1xx_hal_tim.o"
+"transit\stm32f1xx_hal_tim_ex.o"
+"transit\stm32f1xx_hal.o"
+"transit\stm32f1xx_hal_rcc.o"
+"transit\stm32f1xx_hal_rcc_ex.o"
+"transit\stm32f1xx_hal_gpio.o"
+"transit\stm32f1xx_hal_dma.o"
+"transit\stm32f1xx_hal_cortex.o"
+"transit\stm32f1xx_hal_pwr.o"
+"transit\stm32f1xx_hal_flash.o"
+"transit\stm32f1xx_hal_flash_ex.o"
+"transit\stm32f1xx_hal_exti.o"
+"transit\stm32f1xx_hal_uart.o"
+"transit\system_stm32f1xx.o"
+--library_type=microlib --strict --scatter "Transit\Transit.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "Transit.map" -o Transit\Transit.axf
