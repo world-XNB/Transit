@@ -10,8 +10,8 @@
 //@parm num：设置占空比（自动重装载系数为1000）
 void L_Motor_C(int16_t num)
 {
-	HAL_GPIO_WritePin(Output1_GPIO_Port,Output1_Pin,GPIO_PIN_SET);
-	HAL_GPIO_WritePin(Output2_GPIO_Port,Output2_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output1_GPIO_Port,Output1_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output2_GPIO_Port,Output2_Pin,GPIO_PIN_SET);
 	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,num);
 }
 
@@ -19,8 +19,8 @@ void L_Motor_C(int16_t num)
 //@parm num：设置占空比（自动重装载系数为1000）
 void L_Motor_R(int16_t num)
 {
-	HAL_GPIO_WritePin(Output1_GPIO_Port,Output1_Pin,GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(Output2_GPIO_Port,Output2_Pin,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(Output1_GPIO_Port,Output1_Pin,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(Output2_GPIO_Port,Output2_Pin,GPIO_PIN_RESET);
 	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,num);
 }
 
@@ -28,8 +28,8 @@ void L_Motor_R(int16_t num)
 //@parm num：设置占空比（自动重装载系数为1000）
 void R_Motor_C(int16_t num)
 {
-	HAL_GPIO_WritePin(Output3_GPIO_Port,Output3_Pin,GPIO_PIN_SET);
-	HAL_GPIO_WritePin(Output4_GPIO_Port,Output4_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output3_GPIO_Port,Output3_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output4_GPIO_Port,Output4_Pin,GPIO_PIN_SET);
 	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_2,num);
 }
 
@@ -37,42 +37,68 @@ void R_Motor_C(int16_t num)
 //@parm num：设置占空比（自动重装载系数为1000）
 void R_Motor_R(int16_t num)
 {
-	HAL_GPIO_WritePin(Output3_GPIO_Port,Output3_Pin,GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(Output4_GPIO_Port,Output4_Pin,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(Output3_GPIO_Port,Output3_Pin,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(Output4_GPIO_Port,Output4_Pin,GPIO_PIN_RESET);
 	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_2,num);
 }
 
 
 //@brief 小车前进函数
 //@parm speed:前进速度
-void GoStright(int16_t speed)
+void GoStright(void)
 {
-	L_Motor_C(speed);
-	R_Motor_C(speed);
+	L_Motor_C(basic_speed);
+	R_Motor_C(basic_speed);
 }
 
-void TurnLeft(void) 
+//brief 小车左转函数
+void TurnLeft(int16_t mul) 
 {
-	L_Motor_C(400);
-	R_Motor_C(100);
+	int16_t temp;
+	temp=basic_speed*mul;
+	L_Motor_C(basic_speed);
+	R_Motor_C(temp);
 }
 
-void TurnRight(void)
+//brief 小车右转函数
+void TurnRight(int16_t mul)
 {
-	L_Motor_C(100);
-	R_Motor_C(400);
+	int16_t temp;
+	temp=basic_speed*mul;
+	L_Motor_C(temp);
+	R_Motor_C(basic_speed);
+}
+
+//brief 小车制动函数
+void Stop(void)
+{
+	HAL_GPIO_WritePin(Output1_GPIO_Port,Output1_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output2_GPIO_Port,Output2_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output3_GPIO_Port,Output3_Pin,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(Output4_GPIO_Port,Output4_Pin,GPIO_PIN_RESET);
 }
 
 //@brief 循迹函数
-//循迹传感器为小车左侧第二个，第三个
+//循迹传感器为小车中间两个，右二：Input2;左二：Input3
+//led亮起I/O口检测到低电平
 void FollowTheTrack(void)
 {
-  if( HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_SET)
-		GoStright(0);
-	else if( HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_RESET&&HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_RESET)
-		GoStright(100);
-	else if( HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_RESET)
-		TurnRight();
-	else if( HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_RESET&&HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_SET)
-		TurnLeft();
+  if( HAL_GPIO_ReadPin(Input1_GPIO_Port,Input1_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&
+		HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input4_GPIO_Port,Input4_Pin)==GPIO_PIN_SET)
+		Stop();
+	else if( HAL_GPIO_ReadPin(Input1_GPIO_Port,Input1_Pin)==GPIO_PIN_RESET&&HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&
+		HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_RESET&&HAL_GPIO_ReadPin(Input4_GPIO_Port,Input4_Pin)==GPIO_PIN_SET)
+		GoStright();
+	else if( HAL_GPIO_ReadPin(Input1_GPIO_Port,Input1_Pin)==GPIO_PIN_RESET&&HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&
+		HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input4_GPIO_Port,Input4_Pin)==GPIO_PIN_SET)
+		TurnLeft(3);
+	else if( HAL_GPIO_ReadPin(Input1_GPIO_Port,Input1_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_RESET&&
+		HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input4_GPIO_Port,Input4_Pin)==GPIO_PIN_SET)
+		TurnLeft(5);
+	else if( HAL_GPIO_ReadPin(Input1_GPIO_Port,Input1_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&
+		HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_RESET&&HAL_GPIO_ReadPin(Input4_GPIO_Port,Input4_Pin)==GPIO_PIN_SET)
+		TurnRight(3);
+	else if( HAL_GPIO_ReadPin(Input1_GPIO_Port,Input1_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input2_GPIO_Port,Input2_Pin)==GPIO_PIN_SET&&
+		HAL_GPIO_ReadPin(Input3_GPIO_Port,Input3_Pin)==GPIO_PIN_SET&&HAL_GPIO_ReadPin(Input4_GPIO_Port,Input4_Pin)==GPIO_PIN_RESET)
+		TurnRight(5);
 }

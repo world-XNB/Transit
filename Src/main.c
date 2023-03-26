@@ -101,16 +101,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		HAL_GPIO_TogglePin(Led_GPIO_Port,Led_Pin);
-
-//		GoStright(500);
-//		HAL_Delay(1000);
-//	  TurnRight();
-//		HAL_Delay(1000);
-//		TurnLeft();
-		HAL_Delay(1000);
+//		HAL_GPIO_TogglePin(Led_GPIO_Port,Led_Pin);
 //		HAL_GPIO_WritePin(Led_GPIO_Port,Led_Pin,GPIO_PIN_SET);
-//    FollowTheTrack();
+    FollowTheTrack();
   }
   /* USER CODE END 3 */
 }

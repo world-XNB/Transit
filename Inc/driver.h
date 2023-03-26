@@ -4,6 +4,8 @@
 #include "gpio.h"
 #include "tim.h"
 
+static int16_t basic_speed=150;
+
 void L_Motor_C(int16_t num);
 
 void L_Motor_R(int16_t num);
@@ -11,13 +13,15 @@ void L_Motor_R(int16_t num);
 void R_Motor_C(int16_t num);
 
 void R_Motor_R(int16_t num);
+
+void GoStright(void);
+
+void TurnLeft(int16_t mul);
+
+void TurnRight(int16_t mul);
+
+void Stop(void);
 	
 void FollowTheTrack(void);
-
-void GoStright(int16_t speed);
-
-void TurnLeft(void);
-
-void TurnRight(void);
 
 #endif 
