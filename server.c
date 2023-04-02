@@ -10,11 +10,9 @@
 #define CONNECT_MAX 8
 #define BUFFER_SIZE 1024  
 
-#define QUIT_CMD ".quit"  
-
 static int sockfd;
 
-int client_fds[CONNECT_MAX]; 
+int client_sockfds[CONNECT_MAX]; 
 
 //软件中断函数，kill -l查看系统信号列表
 static void sig_dispose(int sig)
@@ -31,8 +29,11 @@ int main(int argc, char *argv[])
     struct sockaddr_in my_addr;
     int err_log;
 
-    char input_msg[BUFFER_SIZE];  
-    char recv_msg[BUFFER_SIZE]; 
+    char input_buf[BUFFER_SIZE];  
+    char recv_buf[BUFFER_SIZE]; 
+
+    //标准输入时有回车，所以此时应该加“\n”
+    char QUIT_CMD[10]=".quit\n";  
 
     //进程收到SIGINT信号的时候，用sig_dispose进行处理
     signal(SIGINT,sig_dispose);
@@ -73,24 +74,25 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
-    fd_set server_fd_set;   //fd_set变量
+    fd_set readset;   //fd_set变量
     int max_fd=-1;  //最大监听的文件描述符个数
     struct timeval tv;  //超时时间设置
     
     while(1)
     {   
         //初始化fd_set变量
-        FD_ZERO(&server_fd_set);
+        FD_ZERO(&readset);
 
         //监视文件描述符0的变化，及标准输入的变化
-        FD_SET(STDIN_FILENO, &server_fd_set);
+        FD_SET(STDIN_FILENO, &readset);
+
         if(max_fd < STDIN_FILENO)
         {
             max_fd = STDIN_FILENO;
         }
         
         //检测服务器socket文件标识符的变化
-        FD_SET(sockfd, &server_fd_set);
+        FD_SET(sockfd, &readset);
         if (max_fd < sockfd)
         {
             max_fd = sockfd;
@@ -99,22 +101,23 @@ int main(int argc, char *argv[])
         //客户端连接
         for (int i = 0; i < CONNECT_MAX; i++)
         {
-            if (client_fds[i] !=0)
+            if (client_sockfds[i] !=0)
             {
-                FD_SET(client_fds[i], &server_fd_set);  
-                if(max_fd < client_fds[i])  
+                FD_SET(client_sockfds[i], &readset);  
+                if(max_fd < client_sockfds[i])  
                 {  
-                    max_fd = client_fds[i];  
+                    max_fd = client_sockfds[i];  
                 } 
             }
         }
 
         //超时时间 
-        tv.tv_sec = 20;
+        tv.tv_sec = 10;
         tv.tv_usec = 0;
 
         //调用select函数. 若有控制台输入数据或则服务器文件标识符可读或则有新客户端连接，则返回大于0的整数，如果没有输入数据而引发超时，返回0.
-        int ret = select(max_fd + 1, &server_fd_set, NULL, NULL, &tv);  
+        //ret 为未状态发生变化的文件描述符的个数  
+        int ret = select(max_fd + 1, &readset, NULL, NULL, &tv);  
         if(ret < 0)  
         {  
             perror("select 出错\n");  
@@ -127,29 +130,36 @@ int main(int argc, char *argv[])
         }
         else
         {
-            //ret 为未状态发生变化的文件描述符的个数  
-            if(FD_ISSET(STDIN_FILENO, &server_fd_set))  
+            // 检测标准输入是否有待读入数据
+            if(FD_ISSET(STDIN_FILENO, &readset))  
             {  
-                printf("发送消息：\n");  
-                bzero(input_msg, BUFFER_SIZE);  
-                fgets(input_msg, BUFFER_SIZE, stdin);  
+                printf("发送消息:"); 
+                bzero(input_buf, BUFFER_SIZE);  
+                fgets(input_buf, BUFFER_SIZE, stdin);  
+                printf("%s",input_buf);
+
                 //输入“.quit"则退出服务器  
-                if(strcmp(input_msg, QUIT_CMD) == 0)  
+                if(strcmp(input_buf, QUIT_CMD) == 0)  
                 {  
+                    printf("服务器已退出!!!\n");
                     exit(0);  
                 }  
-                for(int i = 0; i < CONNECT_MAX; i++)  
-                {  
-                    if(client_fds[i] != 0)  
+                else
+                {
+                    for(int i = 0; i < CONNECT_MAX; i++)  
                     {  
-                        printf("client_fds[%d]=%d\n", i, client_fds[i]);  
-                        send(client_fds[i], input_msg, BUFFER_SIZE, 0);  
-                    }  
-                }  
+                        if(client_sockfds[i] != 0)  
+                        {  
+                            printf("server_sockfd=%d\t\tclient_sockfds[%d]=%d\n", sockfd, i, client_sockfds[i]);  
+                            send(client_sockfds[i], input_buf, BUFFER_SIZE, 0);  
+                        }  
+                    } 
+                }
             }  
-            if(FD_ISSET(sockfd, &server_fd_set))  
+
+            // 检测有新的连接请求  
+            if(FD_ISSET(sockfd, &readset))  
             {  
-                //有新的连接请求  
                 struct sockaddr_in client_address;  
                 socklen_t address_len;  
                 int client_sock_fd = accept(sockfd, (struct sockaddr *)&client_address, &address_len);  
@@ -159,10 +169,10 @@ int main(int argc, char *argv[])
                     int index = -1;  
                     for(int i = 0; i < CONNECT_MAX; i++)  
                     {  
-                        if(client_fds[i] == 0)  
+                        if(client_sockfds[i] == 0)  
                         {  
                             index = i;  
-                            client_fds[i] = client_sock_fd;  
+                            client_sockfds[i] = client_sock_fd;  
                             break;  
                         }  
                     }  
@@ -172,30 +182,32 @@ int main(int argc, char *argv[])
                     }  
                     else  
                     {  
-                        bzero(input_msg, BUFFER_SIZE);  
-                        strcpy(input_msg, "服务器加入的客户端数达到最大值,无法加入!\n");  
-                        send(client_sock_fd, input_msg, BUFFER_SIZE, 0);  
+                        bzero(input_buf, BUFFER_SIZE);  
+                        strcpy(input_buf, "服务器加入的客户端数达到最大值,无法加入!\n");  
+                        send(client_sock_fd, input_buf, BUFFER_SIZE, 0);  
                         printf("客户端连接数达到最大值，新客户端加入失败 %s:%d\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));  
                     }  
                 }  
             }  
+
+            // 处理每个客户端连接是否有待读入信息
             for(int i =0; i < CONNECT_MAX; i++)  
             {  
-                if(client_fds[i] !=0)  
+                if(client_sockfds[i] !=0)  
                 {  
-                    if(FD_ISSET(client_fds[i], &server_fd_set))  
+                    if(FD_ISSET(client_sockfds[i], &readset))  
                     {  
                         //处理某个客户端过来的消息  
-                        bzero(recv_msg, BUFFER_SIZE);  
-                        long byte_num = recv(client_fds[i], recv_msg, BUFFER_SIZE, 0);  
+                        bzero(recv_buf, BUFFER_SIZE);  
+                        long byte_num = recv(client_sockfds[i], recv_buf, BUFFER_SIZE, 0);  
                         if (byte_num > 0)  
                         {  
                             if(byte_num > BUFFER_SIZE)  
                             {  
                                 byte_num = BUFFER_SIZE;  
                             }  
-                            recv_msg[byte_num] = '\0';  
-                            printf("客户端(%d):%s\n", i, recv_msg);  
+                            recv_buf[byte_num] = '\0';  
+                            printf("客户端(%d):%s\n", i, recv_buf);  
                         }  
                         else if(byte_num < 0)  
                         {  
@@ -203,8 +215,8 @@ int main(int argc, char *argv[])
                         }  
                         else  
                         {  
-                            FD_CLR(client_fds[i], &server_fd_set);  
-                            client_fds[i] = 0;  
+                            FD_CLR(client_sockfds[i], &readset);  
+                            client_sockfds[i] = 0;  
                             printf("客户端(%d)退出了\n", i);  
                         }  
                     }  

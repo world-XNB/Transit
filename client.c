@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     
     // 将IP地址从字符串格式转换成网络地址格式，支持Ipv4和Ipv6.
     // 将点分十进制的ip地址转化为用于网络传输的数值格式
-    inet_pton(AF_INET, "10.200.20.4", &server_addr.sin_addr);
+    inet_pton(AF_INET, "10.200.20.5", &server_addr.sin_addr);
 
     // 请求连接函数
     int err_log = connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));      // 主动连接服务器
@@ -54,36 +54,55 @@ int main(int argc, char *argv[])
         close(sockfd);
         exit(-1);
     }
-    
+
+    fd_set readset;   //fd_set变量
+    int max_fd=8;  //最大监听的文件描述符个数
+    struct timeval tv;  //超时时间设置
+
+    char send_buf[BUFFER_SIZE] = "";
+    char recv_buf[BUFFER_SIZE] = "";
+    int server_sockfd = 3;
+    long byte_num = 0;
     while(1){
-        //发送信息
-        char send_buf[BUFFER_SIZE] = "";
-        printf("send:");
+        //初始化fd_set变量
+        FD_ZERO(&readset);
+        //监视文件描述符0的变化，及标准输入的变化
+        FD_SET(STDIN_FILENO, &readset);
+        FD_SET(server_sockfd, &readset);
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
 
-        fgets(send_buf,sizeof(send_buf),stdin);
-        *(strchr(send_buf,'\n')) = '\0';    //将第一个出现的'\n'赋值为'\0'
-
-        send(sockfd, send_buf, strlen(send_buf), 0);
-
-        //接受信息
-        // char recv_buf[BUFFER_SIZE] = "";
-        // bzero(recv_buf , BUFFER_SIZE);
-        // int server_sockfd = 3;
-        // long byte_num = recv(server_addr, recv_buf, BUFFER_SIZE, 0); 
-        // printf("%ld",byte_num);
-        // if (byte_num > 0)  
-        // {  
-        //     if(byte_num > BUFFER_SIZE)  
-        //     {  
-        //         byte_num = BUFFER_SIZE;  
-        //     }  
-        //     recv_buf[byte_num] = '\0';  
-        //     printf("服务端消息：%s", recv_buf);  
-        // }  
-        // else if(byte_num < 0)  
-        // {  
-        //     printf("从服务器接受消息出错.\n");  
-        // }  
+        //调用select函数. 若有控制台输入数据或则服务器文件标识符可读或则有新客户端连接，则返回大于0的整数，如果没有输入数据而引发超时，返回0.
+        //ret 为未状态发生变化的文件描述符的个数  
+        int ret = select(max_fd + 1, &readset, NULL, NULL, &tv);  
+        
+        if(FD_ISSET(server_sockfd, &readset))  
+        {  
+            //接受信息
+            bzero(recv_buf , BUFFER_SIZE);
+            byte_num = recv(server_sockfd, recv_buf, BUFFER_SIZE, 0); 
+            printf("%ld",byte_num);
+            if (byte_num > 0)  
+            {  
+                if(byte_num > BUFFER_SIZE)  
+                {  
+                    byte_num = BUFFER_SIZE;  
+                }  
+                recv_buf[byte_num] = '\0';  
+                printf("服务端消息：%s", recv_buf);  
+            }  
+            else
+            {  
+                printf("从服务器接受消息出错.\n");  
+            }  
+        }
+        if(FD_ISSET(STDIN_FILENO, &readset))  
+        {  
+            //发送信息
+            fgets(send_buf,sizeof(send_buf),stdin);
+            *(strchr(send_buf,'\n')) = '\0';    //将第一个出现的'\n'赋值为'\0'
+            send(sockfd, send_buf, strlen(send_buf), 0);
+        }
     }
 
     close(sockfd);
