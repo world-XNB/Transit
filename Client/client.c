@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     
     // 将IP地址从字符串格式转换成网络地址格式，支持Ipv4和Ipv6.
     // 将点分十进制的ip地址转化为用于网络传输的数值格式
-    inet_pton(AF_INET, "10.200.20.6", &server_addr.sin_addr);
+    inet_pton(AF_INET, "10.200.20.7", &server_addr.sin_addr);
 
     // 请求连接函数
     int err_log = connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));      // 主动连接服务器
