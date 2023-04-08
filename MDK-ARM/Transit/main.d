@@ -30,5 +30,8 @@ transit\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
 transit\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h
 transit\main.o: ../Inc/tim.h
 transit\main.o: ../Inc/usart.h
+transit\main.o: D:\Install\Keil\ARM\ARMCC\Bin\..\include\stdio.h
 transit\main.o: ../Inc/gpio.h
 transit\main.o: ../Inc/driver.h
+transit\main.o: ../Inc/client.h
+transit\main.o: D:\Install\Keil\ARM\ARMCC\Bin\..\include\string.h

@@ -77,6 +77,8 @@ void Error_Handler(void);
 #define Input4_Pin GPIO_PIN_6
 #define Input4_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
+//#define SINGLE_END_MARK      //单结束位时打开
+
 
 /* USER CODE END Private defines */
 

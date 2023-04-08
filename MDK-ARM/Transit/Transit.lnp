@@ -1,6 +1,7 @@
 --cpu Cortex-M3
 "transit\startup_stm32f103xb.o"
 "transit\driver.o"
+"transit\client.o"
 "transit\main.o"
 "transit\gpio.o"
 "transit\tim.o"
