@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <signal.h>
 
+#include "modbus.h"
+
 #define CONNECT_MAX 8
 #define BUFFER_SIZE 1024  
 
@@ -24,56 +26,14 @@ static void sig_dispose(int sig)
     }
 }
 
-int main(int argc, char *argv[])
-{    
-    struct sockaddr_in my_addr;
-    int err_log;
-
+// 进行客户端连接,并进行数据处理
+void data_hand()
+{
     char input_buf[BUFFER_SIZE];  
     char recv_buf[BUFFER_SIZE]; 
 
     //标准输入时有回车，所以此时应该加“\n”
-    char QUIT_CMD[10]=".quit\n";  
-
-    //进程收到SIGINT信号的时候，用sig_dispose进行处理
-    signal(SIGINT,sig_dispose);
-    
-    //创建socket
-    //family代表一个协议族，比较熟知的就是AF_INET，PF_PACKET等；
-    //第二个参数是协议类型，常见类型是SOCK_STREAM,SOCK_DGRAM, SOCK_RAW, SOCK_PACKET等；
-    //第三个参数是具体的协议，对于标准套接字来说，其值是0，对于原始套接字来说就是具体的协议值
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd < 0){
-        perror("socket");
-        exit(-1);
-    }
-
-    // 将空间my_addr的前sizeof(my_addr)字节置零
-    bzero(&my_addr, sizeof(my_addr));         
-    my_addr.sin_family = AF_INET;
-    //注意：端口号小于1024，在Linux下需要root用户运行
-    my_addr.sin_port   = htons(502);
-    my_addr.sin_addr.s_addr = htonl(INADDR_ANY);//任意ip地址
-    // my_addr.sin_addr.s_addr = inet_addr("192.168.1.99");//指定ip地址
-    
-    /*绑定函数，将addrlen长度 structsockaddr类型的myaddr地址与sockfd文件描述符绑定到一起，
-    在sockaddr中主要包含服务器端的协议族类型，网络地址和端口号等*/
-    err_log = bind(sockfd, (struct sockaddr*)&my_addr, sizeof(my_addr));
-    if( err_log != 0){
-        perror("binding");
-        close(sockfd);        
-        exit(-1);
-    }
-    
-    /*监听函数，server端不能及时的处理已经建立的连接，这时就会将connect连接放在等待队列中缓存
-    起来。这个等待队列的长度有listen中的backlog参数来设定。*/
-    err_log = listen(sockfd, 10);
-    if(err_log != 0){
-        perror("listen");
-        close(sockfd);        
-        exit(-1);
-    }
-
+    char QUIT_CMD[10]=".quit\n";
     fd_set readset;   //fd_set变量
     int max_fd=-1;  //最大监听的文件描述符个数
     struct timeval tv;  //超时时间设置
@@ -224,8 +184,67 @@ int main(int argc, char *argv[])
             }
         }
     }   
-    // 关闭套接字
-    close(sockfd);       
+}
+
+// 服务器socket初始化进入监听状态,等待客户端连接
+void server_init(void)
+{
+    struct sockaddr_in my_addr;
+    int err_log;
+
+    //创建socket
+    //family代表一个协议族，比较熟知的就是AF_INET，PF_PACKET等；
+    //第二个参数是协议类型，常见类型是SOCK_STREAM,SOCK_DGRAM, SOCK_RAW, SOCK_PACKET等；
+    //第三个参数是具体的协议，对于标准套接字来说，其值是0，对于原始套接字来说就是具体的协议值
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sockfd < 0){
+        perror("socket");
+        exit(-1);
+    }
+
+    // 将空间my_addr的前sizeof(my_addr)字节置零
+    bzero(&my_addr, sizeof(my_addr));         
+    my_addr.sin_family = AF_INET;
+    //注意：端口号小于1024，在Linux下需要root用户运行
+    my_addr.sin_port   = htons(502);
+    my_addr.sin_addr.s_addr = htonl(INADDR_ANY);//任意ip地址
+    // my_addr.sin_addr.s_addr = inet_addr("192.168.1.99");//指定ip地址
     
+    /*绑定函数，将addrlen长度 structsockaddr类型的myaddr地址与sockfd文件描述符绑定到一起，
+    在sockaddr中主要包含服务器端的协议族类型，网络地址和端口号等*/
+    err_log = bind(sockfd, (struct sockaddr*)&my_addr, sizeof(my_addr));
+    if( err_log != 0){
+        perror("binding");
+        close(sockfd);        
+        exit(-1);
+    }
+    
+    /*监听函数，server端不能及时的处理已经建立的连接，这时就会将connect连接放在等待队列中缓存
+    起来。这个等待队列的长度有listen中的backlog参数来设定。*/
+    err_log = listen(sockfd, 10);
+    if(err_log != 0){
+        perror("listen");
+        close(sockfd);        
+        exit(-1);
+    }
+}
+
+int main(int argc, char *argv[])
+{    
+    //结束服务器程序——进程收到SIGINT信号的时候，用sig_dispose进行处理
+    signal(SIGINT,sig_dispose);
+
+    // 服务端socket初始化
+    server_init();
+
+    // 数据处理
+    data_hand();
+
+    // 关闭套接字
+    close(sockfd);      
+
+    // struct MDBOS_ADU adu = modbus_req_ADU_stat();
+    // printf("adu_head_UIdent:%x\n",adu.head.UIdent);
+
     return 0;
 }

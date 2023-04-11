@@ -20,13 +20,11 @@ static void sig_dispose(int sig)
     }
 }
 
-int main(int argc, char *argv[])
+// 服务器socket初始化进入监听状态,等待客户端连接
+// 服务器连接,并进行数据处理
+void connect_server(void)
 {
     struct sockaddr_in server_addr;
-
-    //进程收到SIGINT信号的时候，用sig_dispose进行处理
-    signal(SIGINT,sig_dispose);
-    
     //创建socket
     //family代表一个协议族，比较熟知的就是AF_INET，PF_PACKET等；
     //第二个参数是协议类型，常见类型是SOCK_STREAM,SOCK_DGRAM, SOCK_RAW, SOCK_PACKET等；
@@ -45,7 +43,7 @@ int main(int argc, char *argv[])
     
     // 将IP地址从字符串格式转换成网络地址格式，支持Ipv4和Ipv6.
     // 将点分十进制的ip地址转化为用于网络传输的数值格式
-    inet_pton(AF_INET, "10.200.20.7", &server_addr.sin_addr);
+    inet_pton(AF_INET, "192.168.1.5", &server_addr.sin_addr);
 
     // 请求连接函数
     int err_log = connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));      // 主动连接服务器
@@ -104,6 +102,15 @@ int main(int argc, char *argv[])
             send(sockfd, send_buf, strlen(send_buf), 0);
         }
     }
+}
+
+int main(int argc, char *argv[])
+{
+    //进程收到SIGINT信号的时候，用sig_dispose进行处理
+    signal(SIGINT,sig_dispose);
+
+    // 连接服务器
+    connect_server();
 
     close(sockfd);
     return 0;
