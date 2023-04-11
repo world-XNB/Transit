@@ -41,11 +41,13 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-uint8_t u1_Rxbuff[2];
+uint8_t u1_Rxch=1;
 
 uint8_t u3_Rxlenth=0;
 uint8_t u3_Rxbuff[255];
 uint8_t u3_Rxch=0;
+
+uint8_t recvflag = 0;	//usart3接受回调函数里的标志。0：代表此时接受的是AT指令标志。1：代表此时接受的是服务器数据（透传模式）
 
 /* USER CODE END PM */
 
@@ -101,9 +103,11 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
 	HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//提前启动串口中断准备接受发送AT指令之后的返回数据
+	HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
 	
-	Connect_Wifi();
-	Send_Data();
+	Connect_Wifi();		//连接局域网
+	Connect_IP();	//连接IP
+	recvflag = 1;	  //此时过后为透传模式下的数据传输
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,8 +117,15 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		
-
+	  Send_Data();
+	  if(u1_Rxch == 0x00)
+	  {
+		  recvflag = 0;
+		  Break_IP();
+		  break;
+	  }
+	  else
+		  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
   }
   /* USER CODE END 3 */
 }
@@ -158,8 +169,9 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-extern uint8_t AT[];
-//USART3发送中断回调函数
+
+
+//USART发送中断回调函数
 //@brief Transit callback function for USART3
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {	
@@ -177,25 +189,39 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     {
 		u3_Rxlenth++;
 		u3_Rxbuff[u3_Rxlenth-1]=u3_Rxch;
-		if(u3_Rxch == 0x0A&&u3_Rxbuff[u3_Rxlenth-2] == 0x0D&&u3_Rxbuff[u3_Rxlenth-3] == 0x4B&&u3_Rxbuff[u3_Rxlenth-4] == 0x4F)	//结束标志 0x4f 0x4b 0x0d 0x0a
+		if(recvflag == 0)
 		{
-			printf("Recedatalenth:%d\n",u3_Rxlenth);
-//			for(int i=0;i<u3_Rxlenth;i++)
-//			{
-//				printf("%x\t",u3_Rxbuff[i]);
-//			}
-//			printf("\n");
-//			for(int i=0;i<u3_Rxlenth;i++)
-//			{
-//				printf("%c",u3_Rxbuff[i]);
-//			}
-//			printf("\n");
-			printf("%s\n",u3_Rxbuff);
-			memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
-			u3_Rxlenth=0;
+			if(u3_Rxch == 0x0A&&u3_Rxbuff[u3_Rxlenth-2] == 0x0D&&u3_Rxbuff[u3_Rxlenth-3] == 0x4B&&u3_Rxbuff[u3_Rxlenth-4] == 0x4F)	//结束标志 0x4f 0x4b 0x0d 0x0a(“OK\r\n”)
+			{
+				printf("Recedatalenth:%d\n",u3_Rxlenth);
+//	 			for(int i=0;i<u3_Rxlenth;i++)
+//	 			{
+//	 				printf("%x\t",u3_Rxbuff[i]);
+//	 			}
+//	 			printf("\n");
+//				for(int i=0;i<u3_Rxlenth;i++)
+//				{
+//					printf("%c",u3_Rxbuff[i]);
+//				}
+//				printf("\n");
+				printf("%s\n",u3_Rxbuff);
+				memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
+				u3_Rxlenth=0;
+			}
+			u3_Rxch = 0;
+			HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的
 		}
-		u3_Rxch = 0;
-		HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的
+		else if(recvflag == 1)
+		{
+			if(u3_Rxch == 0x00)	//结束标志 0x0(“\0”)
+			{
+				printf("%s",u3_Rxbuff);
+				memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
+				u3_Rxlenth=0;
+			}
+			u3_Rxch = 0;
+			HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的
+		}
     }
 }
 /* USER CODE END 4 */

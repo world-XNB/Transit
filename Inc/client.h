@@ -6,6 +6,10 @@
 
 void Connect_Wifi(void);
 
+void Connect_IP(void);
+
+void Break_IP(void);
+
 void Send_Data(void);
 
 #endif
