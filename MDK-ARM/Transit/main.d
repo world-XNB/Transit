@@ -35,3 +35,5 @@ transit\main.o: ../Inc/gpio.h
 transit\main.o: ../Inc/driver.h
 transit\main.o: ../Inc/client.h
 transit\main.o: D:\Install\Keil\ARM\ARMCC\Bin\..\include\string.h
+transit\main.o: D:\Install\Keil\ARM\ARMCC\Bin\..\include\stdlib.h
+transit\main.o: ../Inc/modbus.h

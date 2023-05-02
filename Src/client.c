@@ -34,7 +34,7 @@ void Connect_IP(void)
 {
 	uint8_t AT_CIPMODE1[]="AT+CIPMODE=1\r\n";
 	uint8_t AT_CIPSEND[]="AT+CIPSEND\r\n";
-	uint8_t AT_CIPSTART[]="AT+CIPSTART=\"TCP\",\"192.168.1.5\",502\r\n";
+	uint8_t AT_CIPSTART[]="AT+CIPSTART=\"TCP\",\"192.168.1.7\",502\r\n";
 	
 	HAL_UART_Transmit_IT(&huart3, AT_CIPSTART, sizeof(AT_CIPSTART)-1);	//连接服务器IP
 	HAL_Delay(1000);

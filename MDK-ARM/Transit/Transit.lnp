@@ -8,6 +8,7 @@
 "transit\usart.o"
 "transit\stm32f1xx_it.o"
 "transit\stm32f1xx_hal_msp.o"
+"transit\modbus.o"
 "transit\stm32f1xx_hal_gpio_ex.o"
 "transit\stm32f1xx_hal_tim.o"
 "transit\stm32f1xx_hal_tim_ex.o"

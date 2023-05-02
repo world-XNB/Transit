@@ -28,6 +28,8 @@
 #include "driver.h"
 #include "client.h"
 #include "string.h"
+#include "stdlib.h"
+#include "modbus.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,6 +51,14 @@ uint8_t u3_Rxch=0;
 
 uint8_t recvflag = 0;	//usart3接受回调函数里的标志。0：代表此时接受的是AT指令标志。1：代表此时接受的是服务器数据（透传模式）
 
+struct MDBOS_ADU ADU;
+
+uint8_t recving_ADU_flag = 0;	//是否正在接受MODBUS_ADU。0：否；1：是。
+uint8_t lenthbuff = 6;	//用来标识此时MODBUS_ADU_head+fun_code有多少字节数据,初始化为6,既此时需要接受6字节数据（2字节协议标识符、2字节后续字节长度、1字节单元标识符、1字节功能码）
+uint16_t ADU_head_lenth = 0;	//用来存储MODBUS_ADU_head_lenth
+uint8_t ADU_data_pos = 0;	//用来标识ADU_data的下标，数组从零开始
+uint8_t data_buff[1024];
+uint8_t ADU_data_lenth = 0;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -188,7 +198,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     if(huart->Instance == USART3)//判断串口号——usart3不定长接受数据
     {
 		u3_Rxlenth++;
-		u3_Rxbuff[u3_Rxlenth-1]=u3_Rxch;
+		u3_Rxbuff[u3_Rxlenth-1] = u3_Rxch;
 		if(recvflag == 0)
 		{
 			if(u3_Rxch == 0x0A&&u3_Rxbuff[u3_Rxlenth-2] == 0x0D&&u3_Rxbuff[u3_Rxlenth-3] == 0x4B&&u3_Rxbuff[u3_Rxlenth-4] == 0x4F)	//结束标志 0x4f 0x4b 0x0d 0x0a(“OK\r\n”)
@@ -209,20 +219,104 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				u3_Rxlenth=0;
 			}
 			u3_Rxch = 0;
-			HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的
+			HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的（准备接受下次数据）
 		}
 		else if(recvflag == 1)
-		{
-			if(u3_Rxch == 0x00)	//结束标志 0x0(“\0”)
+		{	
+			if(recving_ADU_flag == 0)	//此时接受的是普通数据
 			{
-				printf("%s",u3_Rxbuff);
-				memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
-				u3_Rxlenth=0;
+				if(u3_Rxch == 0x00)	//结束标志 0x0(“\0”)
+				{
+					printf("%s",u3_Rxbuff);
+					memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
+					u3_Rxlenth=0;
+				}
+				else if(u3_Rxch == 0x01&&u3_Rxbuff[u3_Rxlenth-2] == 0x15)	//获取MODBUS_ADU事务处理标识符
+				{
+					recving_ADU_flag = 1;
+					ADU.head.TMIdent[1] = u3_Rxch;
+					ADU.head.TMIdent[0] = u3_Rxbuff[u3_Rxlenth-2];
+					
+					memset(data_buff,0,sizeof(data_buff));
+				}
+			}	
+			else	//此时正在接受MODBUS_ADU
+			{
+				switch(lenthbuff)
+				{
+					case 0 : ADU_head_lenth = *(uint8_t *)ADU.head.lenth; break;
+					case 1 : ADU.fun_code = u3_Rxch; break;
+					case 2 : ADU.head.UIdent = u3_Rxch; break;
+					case 3 : ADU.head.lenth[0] = u3_Rxch; break;
+					case 4 : ADU.head.lenth[1] = u3_Rxch; break;
+					case 5 : ADU.head.PIdent[0] = u3_Rxch; break;
+					case 6 : ADU.head.PIdent[1] = u3_Rxch; break;
+					default : break;
+				}
+			
+				lenthbuff = lenthbuff - 1;	
+				
+				if(ADU_head_lenth != 0)
+					ADU_data_lenth = ADU_head_lenth - 2;
+					
+				if(ADU_data_lenth > 0)	//此时开始接受ADU_data数据
+				{
+					data_buff[ADU_data_pos] = u3_Rxch;
+					ADU_data_pos++;
+					
+					if(ADU_data_lenth == 1)	//数据接受即将结束
+					{				
+						ADU.data = data_buff;	//将MODBUS_ADU_DATA指向我们的数据缓冲区
+						
+						//为下一次接受做准备
+						memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
+
+						u3_Rxlenth = 0;
+						recving_ADU_flag = 0;
+						lenthbuff = 6;
+						ADU_data_pos = 0;	
+						ADU_head_lenth = 0;
+					}
+					
+					ADU_data_lenth--;
+				}
+				else if(ADU_head_lenth == 2)	//请求ADU
+				{			
+					//为下一次接受做准备
+					memset(u3_Rxbuff,0,sizeof(u3_Rxbuff));
+					
+					u3_Rxlenth = 0;
+					recving_ADU_flag = 0;
+					lenthbuff = 6;
+					ADU_data_pos = 0;
+					ADU_head_lenth = 0;
+				}
+				
+				if(recving_ADU_flag == 0)	//接受完成，打印
+				{
+					printf("TMIdent[0]:%x\nTMIdent[1]:%x\n",ADU.head.TMIdent[0],ADU.head.TMIdent[1]);
+					printf("PIdent[0]:%x\n",ADU.head.PIdent[0]); 
+					printf("PIdent[1]:%x\n",ADU.head.PIdent[1]);
+					printf("lenth[0]:%x\n",ADU.head.lenth[0]); 
+					printf("lenth[1]:%x\n",ADU.head.lenth[1]);
+					printf("UIdent:%x\n",ADU.head.UIdent);
+					printf("fun_code:%x\n",ADU.fun_code);
+					
+					uint16_t databu =  *(uint8_t *)ADU.head.lenth - 2;
+					int p = 0;
+					while(databu)
+					{
+						printf("ADU.data[%d]:%x\n",p,ADU.data[p]);
+						p++;
+						databu--;
+					}
+				}
 			}
+
 			u3_Rxch = 0;
-			HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的
+			HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//启动串口中断接收，必须的（准备接受下次数据）
 		}
-    }
+	}
 }
 /* USER CODE END 4 */
 
