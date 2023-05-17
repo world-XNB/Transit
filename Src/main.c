@@ -39,6 +39,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+uint8_t IDENTIFIER = 0x10;		//小车标识符，此时为一号
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,6 +61,19 @@ uint16_t ADU_head_lenth = 0;	//用来存储MODBUS_ADU_head_lenth
 uint8_t ADU_data_pos = 0;	//用来标识ADU_data的下标，数组从零开始
 uint8_t data_buff[1024];
 uint8_t ADU_data_lenth = 0;
+
+uint8_t FunCode = 0x00;	//小车用来存储MODBUS功能码的中间变量
+uint8_t Carspeed = 0;
+uint8_t Pstation = 0;
+uint8_t Pdistance = 0;
+uint8_t cardata[3];	//记录公交此时状态
+
+
+uint16_t last_count;
+uint16_t curr_count;
+uint8_t direct = 0;	//编码器正转0，反转1
+uint16_t overflow = 0;	//编码器溢出标志
+uint16_t count_temp = 0;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -70,7 +85,7 @@ uint8_t ADU_data_lenth = 0;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void CarStat(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -109,9 +124,16 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  MX_TIM3_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
+	
+	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
+	last_count = __HAL_TIM_GET_COUNTER(&htim3);	//记录当前计数值
+	HAL_TIM_Base_Start_IT(&htim4);
+	
 	HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//提前启动串口中断准备接受发送AT指令之后的返回数据
 	HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
 	
@@ -127,15 +149,38 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  Send_Data();
-	  if(u1_Rxch == 0x00)
+	  direct = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim3);	//获取编码器方向
+	  if(FunCode == 0x00)
 	  {
-		  recvflag = 0;
-		  Break_IP();
-		  break;
+		  FollowTheTrack();
+		  if(u1_Rxch == 0x00)	//发送指令断开IP连接
+		  {
+			  recvflag = 0;
+			  Break_IP();
+			  break;
+		  }
+		  else
+			  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
 	  }
 	  else
-		  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
+	  {
+		  if(u1_Rxch == 0x00)	//发送指令断开IP连接
+		  {
+			  recvflag = 0;
+			  Break_IP();
+			  break;
+		  }
+		  else
+			  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
+		  
+		  switch(FunCode)
+		  {
+//			  case 0x00: break;
+			  case 0x41: printf("正在请求小车此时状态！！！\n");  CarStat(); Send_Data(cardata); FunCode = 0x00; break;
+			  case 0x42: printf("正在控制小车：%x\n",ADU.data[0]); modbusControl(ADU.data[0]); FunCode = 0x00; break;
+			  default: FunCode = 0x00; break;
+		  }
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -145,6 +190,7 @@ int main(void)
   * @retval None
   */
 void SystemClock_Config(void)
+	
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
@@ -179,7 +225,51 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void CarStat()
+{
+	cardata[0] = Carspeed;
+	cardata[1] = Pstation;
+	cardata[2] = Pdistance;
+}
 
+//定时器中断回调函数
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim == &htim4)
+	{
+		curr_count = __HAL_TIM_GET_COUNTER(&htim3);
+		if(direct == 0)
+		{
+			count_temp = curr_count+(4000-last_count)+(overflow-1)*4000;	//编码器1s接收到的信号
+			count_temp=count_temp/14;	//编码器转速（电机转一圈14个信号）
+			Carspeed = count_temp/10 ;	//电机减速比10
+			Pstation = Pstation + Carspeed;
+			
+//			printf("direct:%d\tCarspeed:%x\t%d\n",direct,Carspeed,Carspeed);
+		}
+		else if(direct == 1)
+		{
+			count_temp = last_count+(4000-curr_count)+(overflow-1)*4000;	//编码器1s接收到的信号
+			count_temp=count_temp/14;	//编码器转速（电机转一圈14个信号）
+			Carspeed = count_temp/10;	//电机减速比10
+			Pstation = Pstation - Carspeed;
+	
+//			printf("direct:%d\tCarspeed:%x\t%d\n",direct,Carspeed,Carspeed);
+		}
+		
+		overflow = 0;
+		last_count = curr_count;
+		count_temp = 0;
+	}
+	else if(htim == &htim3)
+	{
+		
+		if(direct == 0)
+			overflow++;
+		else if(direct == 1)
+			overflow--;
+	}
+}
 
 //USART发送中断回调函数
 //@brief Transit callback function for USART3
@@ -294,6 +384,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				
 				if(recving_ADU_flag == 0)	//接受完成，打印
 				{
+					FunCode = ADU.fun_code;	//	标注此次MODBUS功能码
+					
 					printf("TMIdent[0]:%x\nTMIdent[1]:%x\n",ADU.head.TMIdent[0],ADU.head.TMIdent[1]);
 					printf("PIdent[0]:%x\n",ADU.head.PIdent[0]); 
 					printf("PIdent[1]:%x\n",ADU.head.PIdent[1]);

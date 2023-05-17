@@ -2,6 +2,18 @@
 
 This is a simulated unmanned bus project！
 
+## 外设功能
+
+1. usart1 串口重定向——测试
+
+2. usart3 esp8266
+
+3. tim2 PWM输出控制电机
+
+4. tim3 编码器输入
+
+5. tim4 定时器定时（1s）
+
 ## 文件介绍
 
 1. 模拟公交小车项目文件  

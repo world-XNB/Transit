@@ -3,6 +3,12 @@
 
 #include "gpio.h"
 #include "tim.h"
+#include "stdio.h"
+
+extern uint8_t IDENTIFIER;
+extern uint8_t FunCode;
+
+
 
 static int16_t basic_speed=150;
 
@@ -23,5 +29,7 @@ void TurnRight(int16_t mul);
 void Stop(void);
 	
 void FollowTheTrack(void);
+
+void modbusControl(uint8_t control);
 
 #endif 

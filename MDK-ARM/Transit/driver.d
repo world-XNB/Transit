@@ -31,3 +31,4 @@ transit\driver.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim.h
 transit\driver.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
 transit\driver.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h
 transit\driver.o: ../Inc/tim.h
+transit\driver.o: D:\Install\Keil\ARM\ARMCC\Bin\..\include\stdio.h

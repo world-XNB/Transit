@@ -10,6 +10,6 @@ void Connect_IP(void);
 
 void Break_IP(void);
 
-void Send_Data(void);
+void Send_Data(uint8_t *data);
 
 #endif
