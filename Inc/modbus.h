@@ -47,4 +47,5 @@ struct MDBOS_ADU
 //用户自定义功能码(范围: 65 至 72 和十进制 100 至 110)
 
 
+struct MDBOS_ADU modbus_rsp_ADU_stat(unsigned char *rdata);
 #endif

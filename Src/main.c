@@ -74,6 +74,9 @@ uint16_t curr_count;
 uint8_t direct = 0;	//编码器正转0，反转1
 uint16_t overflow = 0;	//编码器溢出标志
 uint16_t count_temp = 0;
+
+
+int send_to_server_time = 10;	//定时向服务器发送小车状态（单位：s）
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -127,6 +130,10 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+//  Break_IP();  //如果勤勉连接则断开
+	Connect_Wifi();		//连接局域网
+	Connect_IP();	//连接IP
+	
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
 	
@@ -137,9 +144,9 @@ int main(void)
 	HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//提前启动串口中断准备接受发送AT指令之后的返回数据
 	HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
 	
-	Connect_Wifi();		//连接局域网
-	Connect_IP();	//连接IP
+	
 	recvflag = 1;	  //此时过后为透传模式下的数据传输
+	send_to_server_time = 10;	//网络连接成功后开始计时
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -149,37 +156,56 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  direct = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim3);	//获取编码器方向
-	  if(FunCode == 0x00)
+	  if(u1_Rxch == 0x00)	//发送指令断开IP连接
+	  {
+		  recvflag = 0;
+		  Break_IP();
+		  break;
+	  }
+	  else
+		  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
+	  
+	  
+	  if(FunCode == 0x00)	//循迹行驶
 	  {
 		  FollowTheTrack();
-		  if(u1_Rxch == 0x00)	//发送指令断开IP连接
-		  {
-			  recvflag = 0;
-			  Break_IP();
-			  break;
-		  }
-		  else
-			  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
 	  }
 	  else
 	  {
-		  if(u1_Rxch == 0x00)	//发送指令断开IP连接
+		  if(FunCode == 0x41)	//小车被控制
 		  {
-			  recvflag = 0;
-			  Break_IP();
-			  break;
+			  printf("正在控制小车：%x\n",ADU.data[0]); 
+			  modbusControl(ADU.data[0]); 
+			  FunCode = 0x00;
 		  }
-		  else
-			  HAL_UART_Receive_IT(&huart1,(uint8_t *)&u1_Rxch,1);	//启动串口中断接收，必须的
+	  }
+	  
+	  
+	  if(send_to_server_time < 0)	//发送小车状态
+	  {
+		  printf("正在请求小车此时状态！！！\n"); 
+		  uint8_t send_ADU[11];
 		  
-		  switch(FunCode)
-		  {
-//			  case 0x00: break;
-			  case 0x41: printf("正在请求小车此时状态！！！\n");  CarStat(); Send_Data(cardata); FunCode = 0x00; break;
-			  case 0x42: printf("正在控制小车：%x\n",ADU.data[0]); modbusControl(ADU.data[0]); FunCode = 0x00; break;
-			  default: FunCode = 0x00; break;
-		  }
+		  direct = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim3);	//获取编码器方向
+		  CarStat();
+		  struct MDBOS_ADU ADU_stat = modbus_rsp_ADU_stat(cardata);
+		  
+		  send_ADU[0] = ADU_stat.head.TMIdent[0];
+		  send_ADU[1] = ADU_stat.head.TMIdent[1];
+		  send_ADU[2] = ADU_stat.head.PIdent[0];
+		  send_ADU[3] = ADU_stat.head.PIdent[1];
+		  send_ADU[4] = ADU_stat.head.lenth[1];
+		  send_ADU[5] = ADU_stat.head.lenth[0];
+		  send_ADU[6] = ADU_stat.head.UIdent;
+		  send_ADU[7] = ADU_stat.fun_code;
+		  send_ADU[8] = ADU_stat.data[0];
+		  send_ADU[9] = ADU_stat.data[1];
+		  send_ADU[10] = ADU_stat.data[2];
+		  
+		  printf("发送ADU:%x\t%x\t%x\t%x\t%x\t%x\t%x\t%x\t%x\t%x\t%x\n",send_ADU[0],send_ADU[1],send_ADU[2],send_ADU[3],send_ADU[4],send_ADU[5],send_ADU[6],send_ADU[7],send_ADU[8],send_ADU[9],send_ADU[10]);   
+		  Send_Data(send_ADU ,11);
+		  
+		  send_to_server_time = 10;	//复位定时，下次发送小车状态
 	  }
   }
   /* USER CODE END 3 */
@@ -237,6 +263,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim == &htim4)
 	{
+		send_to_server_time--;		//定时计数（定时5s）
+		
 		curr_count = __HAL_TIM_GET_COUNTER(&htim3);
 		if(direct == 0)
 		{
@@ -346,7 +374,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			
 				lenthbuff = lenthbuff - 1;	
 				
-				if(ADU_head_lenth != 0)
+				if(ADU_head_lenth != 0 && ADU_data_lenth == 0)	//得出真实数据长度
 					ADU_data_lenth = ADU_head_lenth - 2;
 					
 				if(ADU_data_lenth > 0)	//此时开始接受ADU_data数据

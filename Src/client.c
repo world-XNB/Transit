@@ -1,4 +1,5 @@
 #include "client.h"
+
 extern uint8_t u3_Rxbuff[2];
 extern uint8_t u3_Rxch;
 
@@ -59,10 +60,10 @@ void Break_IP(void)
 	HAL_Delay(1000);
 }
 
-void Send_Data(uint8_t *data)
+void Send_Data(uint8_t *data,int lenth)
 {	
 	//	数据传输
-	HAL_UART_Transmit_IT(&huart3, data, sizeof(data));	
+	HAL_UART_Transmit_IT(&huart3, data, lenth);	
 	HAL_Delay(10000);
 	HAL_UART_Receive(&huart3,(uint8_t *)&u3_Rxch,1,100000);	//启动串口中断接收，必须的
 }
