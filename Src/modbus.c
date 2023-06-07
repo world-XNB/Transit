@@ -14,11 +14,11 @@ struct MDBOS_ADU modbus_rsp_ADU_stat(unsigned char *rdata)
     mbap.TMIdent[1] = 0x01;
     mbap.PIdent[0] = 0x00;
     mbap.PIdent[1] = 0x00;
-    mbap.lenth[0] = 0x05;   //ADU在该字节后面还有2字节（包含2字节的单元标识符,功能码+3字节rdata）
+    mbap.lenth[0] = 0x06;   //ADU在该字节后面还有2字节（包含2字节的单元标识符,功能码+4字节rdata）
     mbap.lenth[1] = 0x00;   
     mbap.UIdent = 0xff;
 
-    pdu.function_code = 0x43;
+    pdu.function_code = 0x41;
     pdu.request_data = rdata;
 
     ADU.head = mbap;

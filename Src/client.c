@@ -36,7 +36,7 @@ void Connect_IP(void)
 	uint8_t AT_CIPMODE1[]="AT+CIPMODE=1\r\n";
 	uint8_t AT_CIPSEND[]="AT+CIPSEND\r\n";
 	uint8_t AT_CIPSTART[]="AT+CIPSTART=\"TCP\",\"192.168.1.5\",502\r\n";
-	
+
 	HAL_UART_Transmit_IT(&huart3, AT_CIPSTART, sizeof(AT_CIPSTART)-1);	//连接服务器IP
 	HAL_Delay(1000);
 	HAL_UART_Transmit_IT(&huart3, AT_CIPMODE1, sizeof(AT_CIPMODE1)-1);	//进入透传模式
@@ -64,7 +64,8 @@ void Send_Data(uint8_t *data,int lenth)
 {	
 	//	数据传输
 	HAL_UART_Transmit_IT(&huart3, data, lenth);	
-	HAL_Delay(10000);
-	HAL_UART_Receive(&huart3,(uint8_t *)&u3_Rxch,1,100000);	//启动串口中断接收，必须的
+//	HAL_Delay(10000);
+//	HAL_UART_Receive(&huart3,(uint8_t *)&u3_Rxch,1,100000);	//启动串口中断接收，必须的
+	HAL_UART_Receive_IT(&huart3,(uint8_t *)&u3_Rxch,1);	//提前启动串口中断准备接受发送AT指令之后的返回数据
 }
 
