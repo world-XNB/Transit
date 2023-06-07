@@ -79,7 +79,7 @@ void connect_server(void)
             //接受信息
             bzero(recv_buf , BUFFER_SIZE);
             byte_num = recv(server_sockfd, recv_buf, BUFFER_SIZE, 0); 
-            printf("%ld",byte_num);
+            // printf("%ld",byte_num);
             if (byte_num > 0)  
             {  
                 if(byte_num > BUFFER_SIZE)  
@@ -87,7 +87,15 @@ void connect_server(void)
                     byte_num = BUFFER_SIZE;  
                 }  
                 recv_buf[byte_num] = '\0';  
-                printf("服务端消息：%s", recv_buf);  
+                // printf("服务端：%s\n",recv_buf);
+                int i=0;
+                printf("服务端：");
+                while(i < byte_num)
+                {
+                    printf("%x\t",recv_buf[i]);
+                    i++;
+                }
+                printf("\n");
             }  
             else
             {  
@@ -106,6 +114,7 @@ void connect_server(void)
 
 int main(int argc, char *argv[])
 {
+    printf("客户端启动...\n");
     //进程收到SIGINT信号的时候，用sig_dispose进行处理
     signal(SIGINT,sig_dispose);
 
